@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Porter's Hook — Ergonomic Redesign</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Crimson+Pro:ital@0;1&display=swap');
+
+:root {
+  --bg: #1a1c22;
+  --panel: #22252e;
+  --border: #2e3240;
+  --iron: #3a3f50;
+  --brass: #c8973a;
+  --brass-dim: rgba(200,151,58,0.15);
+  --chalk: #e8e2d6;
+  --smoke: #767b8e;
+  --green: #3d8c5f;
+  --green-lt: #5fba88;
+  --red: #b84030;
+  --red-lt: #e06050;
+  --amber: #d4853a;
+  --blue: #3a6aaa;
+  --blue-lt: #6a9ada;
+  --f1: #e06050;
+  --f2: #d4853a;
+  --f3: #c8973a;
+  --f4: #5fba88;
+  --thumb: #6a9ada;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--chalk);
+  font-family: 'DM Mono', monospace;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::after {
+  content:'';
+  position:fixed; inset:0;
+  background: radial-gradient(ellipse at 20% 50%, rgba(200,151,58,0.03) 0%, transparent 60%),
+              radial-gradient(ellipse at 80% 20%, rgba(58,106,170,0.04) 0%, transparent 50%);
+  pointer-events:none; z-index:0;
+}
+
+header {
+  padding: 1.6rem 2.5rem 1.2rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative; z-index:1;
+}
+
+.title-block h1 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(1.8rem,4.5vw,3.5rem);
+  letter-spacing: 0.06em;
+  line-height: 0.92;
+}
+.title-block h1 em { color: var(--brass); font-style:normal; }
+.title-block p {
+  font-size: 0.58rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--smoke);
+  margin-top: 0.4rem;
+}
+
+.pill {
+  font-size: 0.56rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.28rem 0.8rem;
+  border-radius: 2px;
+  border: 1px solid var(--brass);
+  color: var(--brass);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  min-height: calc(100vh - 95px);
+  position: relative; z-index:1;
+}
+
+/* LEFT */
+.left {
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  padding: 0 1.8rem;
+}
+.tab {
+  font-size: 0.58rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  padding: 0.8rem 1.1rem;
+  cursor: pointer;
+  color: var(--smoke);
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  background: none; border-top:none; border-left:none; border-right:none;
+  font-family: 'DM Mono', monospace;
+}
+.tab:hover { color: var(--chalk); }
+.tab.active { color: var(--brass); border-bottom-color: var(--brass); }
+
+.hook-viewport {
+  position: relative;
+  background: var(--panel);
+  height: 280px;
+  flex-shrink: 0;
+}
+.hook-viewport canvas { width:100%; height:100%; display:block; }
+.vp-label {
+  position:absolute; top:12px; left:14px;
+  font-size:0.55rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--smoke);
+}
+
+/* Cross section */
+.bottom-panels {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 0;
+  border-top: 1px solid var(--border);
+  flex: 1;
+}
+
+.cs-panel {
+  border-right: 1px solid var(--border);
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.cs-panel .panel-label {
+  font-size: 0.55rem; letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--smoke); margin-bottom: 0.7rem; align-self: flex-start;
+}
+.cs-panel canvas { width: 160px; height: 160px; }
+
+.finger-panel {
+  padding: 1.2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.force-title {
+  font-size: 0.55rem; letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--smoke); margin-bottom: 0.8rem;
+}
+
+.finger-rows { display:flex; flex-direction:column; gap:0.5rem; }
+
+.finger-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.finger-name {
+  font-size: 0.6rem;
+  width: 48px;
+  flex-shrink: 0;
+}
+.force-track {
+  flex:1; height:16px;
+  background: var(--bg);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.force-fill {
+  height:100%; border-radius:2px;
+  transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+  display:flex; align-items:center; justify-content:flex-end; padding-right:4px;
+  font-size:0.5rem; color:rgba(255,255,255,0.75);
+}
+.force-val {
+  font-size:0.6rem; width:42px; text-align:right; flex-shrink:0;
+  font-variant-numeric: tabular-nums;
+}
+
+.ff-status {
+  margin-top:0.7rem; display:flex; align-items:center; gap:0.5rem; font-size:0.58rem;
+}
+.ff-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+
+/* Mass distribution strip */
+.mass-strip {
+  border-top: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.mass-col {
+  padding: 0.9rem 1.5rem;
+}
+.mass-col:first-child { border-right: 1px solid var(--border); }
+.mass-col h4 {
+  font-size:0.55rem; letter-spacing:0.14em; text-transform:uppercase;
+  color:var(--smoke); margin-bottom:0.5rem;
+}
+.mass-track {
+  height:18px; background:var(--bg); border-radius:2px;
+  display:flex; overflow:hidden;
+}
+.mass-seg {
+  height:100%; display:flex; align-items:center; justify-content:flex-end;
+  padding-right:4px; font-size:0.5rem; color:rgba(255,255,255,0.7);
+  transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+}
+.mass-meta {
+  display:flex; justify-content:space-between;
+  font-size:0.56rem; color:var(--smoke); margin-top:0.3rem;
+}
+.mass-badge {
+  display:inline-flex; align-items:center; gap:0.35rem;
+  font-size:0.55rem; padding:0.2rem 0.55rem; border-radius:2px;
+  border:1px solid; margin-top:0.4rem; transition:all 0.3s;
+}
+
+/* RIGHT */
+.right {
+  overflow-y: auto;
+  padding: 1.3rem 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.section-head {
+  font-size: 0.52rem; letter-spacing:0.2em; text-transform:uppercase;
+  color:var(--smoke); padding-bottom:0.4rem; border-bottom:1px solid var(--border);
+}
+
+.ctrl-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.ctrl-head {
+  padding:0.45rem 0.85rem; background:var(--border);
+  font-size:0.53rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--brass);
+}
+.ctrl-body { padding:0.85rem; display:flex; flex-direction:column; gap:0.7rem; }
+
+.sl-row { display:flex; flex-direction:column; gap:0.22rem; }
+.sl-top { display:flex; justify-content:space-between; }
+.sl-top label { font-size:0.6rem; color:var(--smoke); }
+.sl-top .sv { font-size:0.62rem; color:var(--brass); font-weight:500; }
+
+input[type=range] {
+  -webkit-appearance:none; width:100%; height:2px;
+  background:var(--iron); outline:none; border-radius:2px;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance:none; width:12px; height:12px;
+  border-radius:50%; background:var(--brass); cursor:pointer; transition:transform 0.15s;
+}
+input[type=range]::-webkit-slider-thumb:hover { transform:scale(1.35); }
+
+.contour-grid {
+  display:grid; grid-template-columns:repeat(3,1fr); gap:0.35rem;
+}
+.c-btn {
+  background:var(--bg); border:1px solid var(--border); color:var(--smoke);
+  padding:0.4rem 0.25rem; border-radius:2px;
+  font-family:'DM Mono',monospace; font-size:0.54rem; letter-spacing:0.05em;
+  cursor:pointer; transition:all 0.2s; text-align:center;
+}
+.c-btn:hover { border-color:var(--smoke); color:var(--chalk); }
+.c-btn.active { border-color:var(--brass); color:var(--brass); background:var(--brass-dim); }
+
+.score-card {
+  background:var(--panel); border:1px solid var(--border);
+  border-radius:3px; padding:0.9rem;
+}
+.score-top {
+  display:flex; align-items:center; gap:0.9rem; margin-bottom:0.7rem;
+}
+.score-ring { position:relative; flex-shrink:0; }
+.score-ring svg { transform:rotate(-90deg); }
+.score-inner {
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+}
+.score-num {
+  font-family:'Bebas Neue',sans-serif; font-size:1.7rem; line-height:1; color:var(--brass);
+}
+.score-sub { font-size:0.4rem; color:var(--smoke); letter-spacing:0.08em; }
+.score-title { font-size:0.58rem; color:var(--smoke); }
+.score-title strong { display:block; font-size:0.95rem; font-family:'Bebas Neue'; color:var(--chalk); }
+
+.metrics { display:flex; flex-direction:column; gap:0.28rem; }
+.metric-row { display:flex; justify-content:space-between; font-size:0.58rem; }
+.metric-row span:first-child { color:var(--smoke); }
+.metric-stars { color:var(--brass); letter-spacing:-1px; }
+
+.chips { display:flex; flex-wrap:wrap; gap:0.3rem; }
+.chip {
+  font-size:0.5rem; padding:0.16rem 0.45rem; border-radius:2px;
+  border:1px solid; letter-spacing:0.06em; text-transform:uppercase;
+}
+.chip.good { border-color:var(--green); color:var(--green-lt); background:rgba(63,140,95,0.08); }
+.chip.warn { border-color:var(--red); color:var(--red-lt); background:rgba(184,64,48,0.08); }
+
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+.left  { animation: fadeIn 0.4s ease forwards; }
+.right { animation: fadeIn 0.5s 0.08s ease both; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title-block">
+    <h1>PORTER'S HOOK — <em>ERGONOMIC</em> REDESIGN</h1>
+    <p>Biomechanical Handle · Equal Finger Force Distribution · Balanced Mass</p>
+  </div>
+  <span class="pill">Industrial Biomechanics</span>
+</header>
+
+<div class="layout">
+
+  <!-- ════ LEFT ════ -->
+  <div class="left">
+    <div class="tabs">
+      <button class="tab active" onclick="setTab(this,'hook')">Hook Profile</button>
+      <button class="tab" onclick="setTab(this,'cross')">Cross-Section View</button>
+      <button class="tab" onclick="setTab(this,'compare')">Compare</button>
+    </div>
+
+    <div class="hook-viewport">
+      <span class="vp-label" id="vp-lbl">Redesigned — Side View</span>
+      <canvas id="hookCanvas"></canvas>
+    </div>
+
+    <div class="bottom-panels">
+      <!-- Cross section -->
+      <div class="cs-panel">
+        <div class="panel-label">Handle Cross-Section</div>
+        <canvas id="csCanvas"></canvas>
+        <div style="font-size:0.52rem;color:var(--smoke);margin-top:0.6rem;text-align:center;line-height:1.5">
+          Finger saddle zones<br>sized to equal contact area
+        </div>
+      </div>
+
+      <!-- Finger force -->
+      <div class="finger-panel">
+        <div class="force-title">Finger Force Distribution (total load = 40 N)</div>
+        <div class="finger-rows">
+          <div class="finger-row">
+            <span class="finger-name" style="color:var(--thumb)">Thumb</span>
+            <div class="force-track"><div class="force-fill" id="ff-thumb" style="background:var(--thumb)"></div></div>
+            <span class="force-val" id="fv-thumb" style="color:var(--thumb)"></span>
+          </div>
+          <div class="finger-row">
+            <span class="finger-name" style="color:var(--f1)">Index</span>
+            <div class="force-track"><div class="force-fill" id="ff-index" style="background:var(--f1)"></div></div>
+            <span class="force-val" id="fv-index" style="color:var(--f1)"></span>
+          </div>
+          <div class="finger-row">
+            <span class="finger-name" style="color:var(--f2)">Middle</span>
+            <div class="force-track"><div class="force-fill" id="ff-middle" style="background:var(--f2)"></div></div>
+            <span class="force-val" id="fv-middle" style="color:var(--f2)"></span>
+          </div>
+          <div class="finger-row">
+            <span class="finger-name" style="color:var(--f3)">Ring</span>
+            <div class="force-track"><div class="force-fill" id="ff-ring" style="background:var(--f3)"></div></div>
+            <span class="force-val" id="fv-ring" style="color:var(--f3)"></span>
+          </div>
+          <div class="finger-row">
+            <span class="finger-name" style="color:var(--f4)">Pinky</span>
+            <div class="force-track"><div class="force-fill" id="ff-pinky" style="background:var(--f4)"></div></div>
+            <span class="force-val" id="fv-pinky" style="color:var(--f4)"></span>
+          </div>
+        </div>
+        <div class="ff-status">
+          <div class="ff-dot" id="ff-dot"></div>
+          <span id="ff-text" style="font-size:0.58rem"></span>
+        </div>
+        <div style="margin-top:0.8rem;font-size:0.58rem;color:var(--smoke);line-height:1.65">
+          Each saddle channel is sized to the <span style="color:var(--chalk)">anatomical girth</span>
+          of that finger → equal contact area → equal pressure → equal force.
+        </div>
+      </div>
+    </div>
+
+    <!-- Mass strip -->
+    <div class="mass-strip">
+      <div class="mass-col">
+        <h4>Mass Distribution — Original</h4>
+        <div class="mass-track">
+          <div class="mass-seg" style="background:var(--red);width:62%">62%</div>
+          <div class="mass-seg" style="background:var(--iron);width:38%">38%</div>
+        </div>
+        <div class="mass-meta">
+          <span>Front <span style="color:var(--red-lt)">62%</span></span>
+          <span>Rear <span style="color:var(--smoke)">38%</span></span>
+        </div>
+        <div class="mass-badge" style="border-color:var(--red);color:var(--red-lt)">● Front-heavy · high wrist torque</div>
+      </div>
+      <div class="mass-col">
+        <h4>Mass Distribution — Redesigned</h4>
+        <div class="mass-track">
+          <div class="mass-seg" id="md-front" style="background:var(--brass)"></div>
+          <div class="mass-seg" id="md-rear" style="background:var(--green)"></div>
+        </div>
+        <div class="mass-meta">
+          <span>Front <span id="md-fp" style="color:var(--brass)"></span></span>
+          <span>Rear <span id="md-rp" style="color:var(--green-lt)"></span></span>
+        </div>
+        <div class="mass-badge" id="mass-badge">● <span id="mass-badge-txt"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ RIGHT ════ -->
+  <div class="right">
+
+    <div class="section-head">Handle Geometry</div>
+
+    <div class="ctrl-card">
+      <div class="ctrl-head">Grip Dimensions</div>
+      <div class="ctrl-body">
+        <div class="sl-row">
+          <div class="sl-top"><label>Handle Length</label><span class="sv" id="sv-len">280 mm</span></div>
+          <input type="range" min="180" max="400" value="280" oninput="sp('len',this.value)">
+        </div>
+        <div class="sl-row">
+          <div class="sl-top"><label>Base Diameter</label><span class="sv" id="sv-dia">36 mm</span></div>
+          <input type="range" min="22" max="55" value="36" oninput="sp('dia',this.value)">
+        </div>
+        <div class="sl-row">
+          <div class="sl-top"><label>Finger Groove Depth</label><span class="sv" id="sv-grv">5 mm</span></div>
+          <input type="range" min="1" max="12" value="5" oninput="sp('grv',this.value)">
+        </div>
+        <div class="sl-row">
+          <div class="sl-top"><label>Groove Spacing (pitch)</label><span class="sv" id="sv-pit">18 mm</span></div>
+          <input type="range" min="12" max="28" value="18" oninput="sp('pit',this.value)">
+        </div>
+      </div>
+    </div>
+
+    <div class="ctrl-card">
+      <div class="ctrl-head">Counterweight &amp; Balance</div>
+      <div class="ctrl-body">
+        <div class="sl-row">
+          <div class="sl-top"><label>Counterweight Offset</label><span class="sv" id="sv-cwt">48 %</span></div>
+          <input type="range" min="20" max="65" value="48" oninput="sp('cwt',this.value)">
+        </div>
+        <div class="sl-row">
+          <div class="sl-top"><label>Counterweight Bulge</label><span class="sv" id="sv-cwb">1.5×</span></div>
+          <input type="range" min="10" max="25" value="15" oninput="sp('cwb',this.value)">
+        </div>
+        <div class="sl-row">
+          <div class="sl-top"><label>Palm Swell Ratio</label><span class="sv" id="sv-swl">1.4×</span></div>
+          <input type="range" min="10" max="22" value="14" oninput="sp('swl',this.value)">
+        </div>
+      </div>
+    </div>
+
+    <div class="ctrl-card">
+      <div class="ctrl-head">Hook Profile</div>
+      <div class="ctrl-body">
+        <div class="sl-row">
+          <div class="sl-top"><label>Hook Curvature</label><span class="sv" id="sv-crv">65°</span></div>
+          <input type="range" min="35" max="120" value="65" oninput="sp('crv',this.value)">
+        </div>
+        <div class="sl-row">
+          <div class="sl-top"><label>Hook Reach</label><span class="sv" id="sv-rch">90 mm</span></div>
+          <input type="range" min="50" max="150" value="90" oninput="sp('rch',this.value)">
+        </div>
+      </div>
+    </div>
+
+    <div class="ctrl-card">
+      <div class="ctrl-head">Finger Contour Profile</div>
+      <div class="ctrl-body">
+        <div class="contour-grid">
+          <button class="c-btn active" id="cp-ergonomic"   onclick="setContour('ergonomic')">Ergonomic</button>
+          <button class="c-btn"        id="cp-anatomic"    onclick="setContour('anatomic')">Anatomic</button>
+          <button class="c-btn"        id="cp-cylindrical" onclick="setContour('cylindrical')">Cylindrical</button>
+          <button class="c-btn"        id="cp-oval"        onclick="setContour('oval')">Oval</button>
+          <button class="c-btn"        id="cp-pistol"      onclick="setContour('pistol')">Pistol-Grip</button>
+          <button class="c-btn"        id="cp-triangular"  onclick="setContour('triangular')">Triangular</button>
+        </div>
+        <div id="contour-desc" style="font-size:0.58rem;color:var(--smoke);margin-top:0.4rem;line-height:1.6">
+          Four saddle channels sized proportionally to each finger's anatomical girth. Achieves near-equal contact pressure across all fingers.
+        </div>
+      </div>
+    </div>
+
+    <div class="score-card">
+      <div class="score-top">
+        <div class="score-ring">
+          <svg width="68" height="68" viewBox="0 0 68 68">
+            <circle cx="34" cy="34" r="26" fill="none" stroke="var(--border)" stroke-width="5"/>
+            <circle cx="34" cy="34" r="26" fill="none" stroke="var(--brass)" stroke-width="5"
+              stroke-dasharray="163" id="score-arc" stroke-dashoffset="30" stroke-linecap="round"/>
+          </svg>
+          <div class="score-inner">
+            <div class="score-num" id="score-num">82</div>
+            <div class="score-sub">/ 100</div>
+          </div>
+        </div>
+        <div>
+          <div class="score-title">
+            <strong id="score-label">Very Good</strong>
+            Ergonomic Score
+          </div>
+        </div>
+      </div>
+      <div class="metrics">
+        <div class="metric-row"><span>Mass Balance</span><span class="metric-stars" id="m-balance">★★★★★</span></div>
+        <div class="metric-row"><span>Finger Force Eq.</span><span class="metric-stars" id="m-finger">★★★★☆</span></div>
+        <div class="metric-row"><span>Wrist Torque</span><span class="metric-stars" id="m-torque">★★★★☆</span></div>
+        <div class="metric-row"><span>Grip Comfort</span><span class="metric-stars" id="m-comfort">★★★★☆</span></div>
+        <div class="metric-row"><span>Fatigue Resistance</span><span class="metric-stars" id="m-fatigue">★★★☆☆</span></div>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size:0.52rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--smoke);margin-bottom:0.45rem">Active Features</div>
+      <div class="chips" id="feat-chips"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─── State ────────────────────────────────────────────────
+const S = {
+  tab: 'hook', contour: 'ergonomic',
+  len:280, dia:36, grv:5, pit:18,
+  cwt:48, cwb:15, swl:14, crv:65, rch:90
+};
+
+const contourData = {
+  ergonomic:   { desc:'Four individual saddle channels, each sized proportionally to that finger\'s anatomical girth. Equal contact area → equal pressure → equal force.', forces:[20,20,20,20,20] },
+  anatomic:    { desc:'Matches the natural relaxed hand curvature. Slightly favours index and middle fingers anatomically. Good but not perfectly equal.', forces:[15,23,26,22,14] },
+  cylindrical: { desc:'Uniform cylinder with no contouring. Index and middle bear majority of load; pinky often lifts off under heavy weight.', forces:[10,30,33,19,8] },
+  oval:        { desc:'Oval cross-section reduces rotation tendency but remains unequal across fingers. Better than cylinder, not as good as saddle profiles.', forces:[14,26,27,22,11] },
+  pistol:      { desc:'Optimised for trigger-index use. Highly unequal distribution — index takes ~38% of load. Not suitable for heavy lifting hooks.', forces:[10,38,24,18,10] },
+  triangular:  { desc:'Three-sided profile locks rotation well but creates high-pressure points on middle knuckle. Moderate imbalance.', forces:[12,24,30,24,10] }
+};
+
+// ─── Canvas refs ──────────────────────────────────────────
+const hCanvas = document.getElementById('hookCanvas');
+const hCtx    = hCanvas.getContext('2d');
+const cCanvas = document.getElementById('csCanvas');
+const cCtx    = cCanvas.getContext('2d');
+
+// ─── Hook drawing ─────────────────────────────────────────
+function resizeHook() {
+  const dpr = window.devicePixelRatio||1;
+  const vp  = hCanvas.parentElement;
+  hCanvas.width  = vp.clientWidth*dpr;
+  hCanvas.height = vp.clientHeight*dpr;
+  hCtx.scale(dpr,dpr);
+  drawHook();
+}
+window.addEventListener('resize', resizeHook);
+
+function drawHook() {
+  const W=hCanvas.clientWidth, H=hCanvas.clientHeight;
+  hCtx.clearRect(0,0,W,H);
+  // grid
+  hCtx.strokeStyle='rgba(255,255,255,0.025)'; hCtx.lineWidth=1;
+  for(let x=0;x<W;x+=24){hCtx.beginPath();hCtx.moveTo(x,0);hCtx.lineTo(x,H);hCtx.stroke();}
+  for(let y=0;y<H;y+=24){hCtx.beginPath();hCtx.moveTo(0,y);hCtx.lineTo(W,y);hCtx.stroke();}
+
+  if(S.tab==='compare'){
+    drawOld(hCtx, W*0.23, H*0.48, 0.34);
+    drawNew(hCtx, W*0.72, H*0.48, 0.34);
+    lbl(hCtx,'ORIGINAL — No finger contouring',14,18,'rgba(224,96,80,0.7)');
+    lbl(hCtx,'REDESIGNED — Finger saddles + equal force',W*0.5+10,18,'rgba(200,151,58,0.7)');
+    hCtx.setLineDash([4,6]);
+    hCtx.beginPath();hCtx.moveTo(W*0.5,0);hCtx.lineTo(W*0.5,H);
+    hCtx.strokeStyle='rgba(255,255,255,0.07)';hCtx.lineWidth=1;hCtx.stroke();
+    hCtx.setLineDash([]);
+  } else {
+    drawNew(hCtx, W*0.43, H*0.5, S.tab==='cross'?0.5:0.5);
+    const tl = S.tab==='cross'
+      ? 'Finger saddle grooves visible on grip section'
+      : 'Redesigned — Contoured Finger-Saddle Handle';
+    lbl(hCtx, tl, 14, 18, 'rgba(200,151,58,0.6)');
+  }
+}
+
+function lbl(ctx,txt,x,y,col){
+  ctx.font="10.5px 'DM Mono',monospace"; ctx.fillStyle=col; ctx.fillText(txt,x,y);
+}
+
+function drawNew(ctx, cx, cy, sc) {
+  ctx.save();
+  const L=S.len*sc, R=S.dia*0.5*sc, cwLen=L*(S.cwt/100), mainL=L*(1-S.cwt/100);
+  const hx=cx-L*0.55, hy=cy, swR=R*(S.swl/10), swx=hx+cwLen+mainL*0.42;
+  const mat='#8a9aaa';
+
+  ctx.shadowColor='rgba(0,0,0,0.5)'; ctx.shadowBlur=16;
+
+  // counterweight
+  ctx.beginPath(); rrect(ctx, hx, hy-R*(S.cwb/10), cwLen*0.88, R*(S.cwb/10)*2, R*0.7);
+  const cg=ctx.createLinearGradient(hx,hy-R*1.6,hx,hy+R*1.6);
+  cg.addColorStop(0,ltn(mat,28)); cg.addColorStop(0.4,mat); cg.addColorStop(1,drk(mat,40));
+  ctx.fillStyle=cg; ctx.fill();
+
+  // grip body
+  ctx.beginPath();
+  ctx.moveTo(hx+cwLen*0.82, hy-R);
+  ctx.bezierCurveTo(hx+cwLen+mainL*0.15,hy-R*0.85, swx-mainL*0.08,hy-swR, swx,hy-swR);
+  ctx.bezierCurveTo(swx+mainL*0.12,hy-swR, hx+L,hy-R*0.72, hx+L,hy-R*0.72);
+  ctx.lineTo(hx+L, hy+R*0.72);
+  ctx.bezierCurveTo(hx+L,hy+R*0.72, swx+mainL*0.12,hy+swR, swx,hy+swR);
+  ctx.bezierCurveTo(swx-mainL*0.08,hy+swR, hx+cwLen+mainL*0.15,hy+R*0.85, hx+cwLen*0.82,hy+R);
+  ctx.closePath();
+  const gg=ctx.createLinearGradient(hx+cwLen,hy-swR*1.6,hx+cwLen,hy+swR*1.6);
+  gg.addColorStop(0,ltn(mat,32)); gg.addColorStop(0.35,mat); gg.addColorStop(1,drk(mat,45));
+  ctx.fillStyle=gg; ctx.fill();
+
+  // finger groove arcs
+  ctx.shadowBlur=0;
+  const colors=['#6a9ada','#e06050','#d4853a','#c8973a','#5fba88'];
+  const nG=Math.min(4,Math.floor(mainL/(S.pit*sc)));
+  for(let i=0;i<nG;i++){
+    const gx=hx+cwLen+mainL*(0.1+i*0.2);
+    const gd=S.grv*sc;
+    // groove depression
+    ctx.beginPath();
+    ctx.arc(gx, hy, R*0.88+gd*0.3, Math.PI*1.08, Math.PI*1.92);
+    ctx.strokeStyle=drk(mat,28); ctx.lineWidth=gd*0.65; ctx.stroke();
+    // colored dot indicator
+    ctx.beginPath(); ctx.arc(gx, hy-R*0.88, gd*0.65, 0, Math.PI*2);
+    ctx.fillStyle=colors[i]+'88'; ctx.fill();
+  }
+
+  // hook
+  ctx.shadowColor='rgba(0,0,0,0.45)'; ctx.shadowBlur=10;
+  const hkx=hx+L, hky=hy, hw=R*1.05, reach=S.rch*sc, ang=S.crv*Math.PI/180;
+  ctx.beginPath();
+  ctx.moveTo(hkx,hky-hw); ctx.lineTo(hkx+reach*0.28,hky-hw);
+  ctx.bezierCurveTo(hkx+reach*0.7,hky-hw,hkx+reach,hky-hw,hkx+reach,hky+reach*Math.tan(ang*0.55));
+  ctx.bezierCurveTo(hkx+reach,hky+reach*Math.tan(ang*0.55)+hw,hkx+reach*0.3,hky+reach*0.38,hkx+reach*0.08,hky+reach*0.38);
+  ctx.lineTo(hkx+reach*0.08,hky+hw*0.35);
+  ctx.bezierCurveTo(hkx+reach*0.5,hky+hw*0.28,hkx+reach-hw,hky+reach*Math.tan(ang*0.45),hkx+reach-hw,hky+reach*Math.tan(ang*0.45)-hw*0.5);
+  ctx.bezierCurveTo(hkx+reach-hw,hky-hw*0.4,hkx+reach*0.5,hky,hkx+reach*0.28,hky);
+  ctx.lineTo(hkx,hky); ctx.closePath();
+  const hkg=ctx.createLinearGradient(hkx,hky-hw*2,hkx,hky+reach);
+  hkg.addColorStop(0,ltn(mat,15)); hkg.addColorStop(1,drk(mat,50));
+  ctx.fillStyle=hkg; ctx.fill();
+
+  // balance marker
+  ctx.shadowBlur=0; ctx.setLineDash([3,5]);
+  ctx.beginPath(); ctx.moveTo(hx+cwLen,hy-R*3.5); ctx.lineTo(hx+cwLen,hy+R*3.5);
+  ctx.strokeStyle='rgba(200,151,58,0.32)'; ctx.lineWidth=1; ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.restore();
+}
+
+function drawOld(ctx,cx,cy,sc){
+  ctx.save();
+  const L=220*sc,R=14*sc,hx=cx-L*0.55,hy=cy,reach=80*sc;
+  ctx.shadowColor='rgba(0,0,0,0.4)'; ctx.shadowBlur=10;
+  ctx.beginPath(); rrect(ctx,hx,hy-R,L,R*2,R*0.3);
+  const g=ctx.createLinearGradient(hx,hy-R,hx,hy+R);
+  g.addColorStop(0,'#7a6a5a'); g.addColorStop(0.5,'#4a3a2a'); g.addColorStop(1,'#2a1a0a');
+  ctx.fillStyle=g; ctx.fill(); ctx.shadowBlur=0;
+  ctx.beginPath();
+  ctx.moveTo(hx+L,hy-R); ctx.lineTo(hx+L+reach*0.78,hy-R);
+  ctx.bezierCurveTo(hx+L+reach*1.05,hy-R,hx+L+reach*1.05,hy+reach*0.65,hx+L+reach*0.6,hy+reach*0.65);
+  ctx.lineTo(hx+L+reach*0.6,hy+reach*0.45);
+  ctx.bezierCurveTo(hx+L+reach*0.85,hy+reach*0.45,hx+L+reach*0.82,hy,hx+L+reach*0.78,hy);
+  ctx.lineTo(hx+L,hy); ctx.closePath();
+  ctx.fillStyle='#4a3a2a'; ctx.fill();
+  ctx.restore();
+}
+
+function rrect(c,x,y,w,h,r){
+  c.beginPath();c.moveTo(x+r,y);c.lineTo(x+w-r,y);c.quadraticCurveTo(x+w,y,x+w,y+r);
+  c.lineTo(x+w,y+h-r);c.quadraticCurveTo(x+w,y+h,x+w-r,y+h);c.lineTo(x+r,y+h);
+  c.quadraticCurveTo(x,y+h,x,y+h-r);c.lineTo(x,y+r);c.quadraticCurveTo(x,y,x+r,y);c.closePath();
+}
+function ltn(h,a){const n=parseInt(h.replace('#',''),16);return`rgb(${Math.min(255,(n>>16)+a)},${Math.min(255,((n>>8)&255)+a)},${Math.min(255,(n&255)+a)})`;}
+function drk(h,a){return ltn(h,-a);}
+
+// ─── Cross section ────────────────────────────────────────
+const CS_COLORS = ['#6a9ada','#e06050','#d4853a','#c8973a','#5fba88'];
+const CS_NAMES  = ['Thumb','Index','Middle','Ring','Pinky'];
+
+function drawCS() {
+  const dpr=window.devicePixelRatio||1;
+  cCanvas.width=160*dpr; cCanvas.height=160*dpr;
+  cCtx.scale(dpr,dpr);
+  cCtx.clearRect(0,0,160,160);
+  const ox=80,oy=80, R=S.dia*1.65;
+  const forces=contourData[S.contour].forces;
+
+  // handle fill
+  const bg=cCtx.createRadialGradient(ox,oy,0,ox,oy,R);
+  bg.addColorStop(0,'#3a3f50'); bg.addColorStop(1,'#22252e');
+  cCtx.beginPath(); cCtx.arc(ox,oy,R,0,Math.PI*2);
+  cCtx.fillStyle=bg; cCtx.fill();
+  cCtx.strokeStyle='#2e3240'; cCtx.lineWidth=1.5; cCtx.stroke();
+
+  // finger sectors — bottom 300° (top is thumb)
+  const sectors = [
+    { a0:-Math.PI*0.82, a1:-Math.PI*0.48, i:0 },
+    { a0:-Math.PI*0.44, a1:-Math.PI*0.08, i:1 },
+    { a0:-Math.PI*0.05, a1: Math.PI*0.28, i:2 },
+    { a0: Math.PI*0.30, a1: Math.PI*0.63, i:3 },
+    { a0: Math.PI*0.65, a1: Math.PI*0.90, i:4 },
+  ];
+
+  const depthMods = {
+    ergonomic:   [0.09,0.11,0.11,0.11,0.09],
+    anatomic:    [0.06,0.10,0.12,0.10,0.06],
+    cylindrical: [0,0,0,0,0],
+    oval:        [0.03,0.05,0.05,0.05,0.03],
+    pistol:      [0.04,0.16,0.09,0.06,0.03],
+    triangular:  [0.05,0.08,0.13,0.08,0.04]
+  };
+  const mods = depthMods[S.contour];
+  const gd   = S.grv/40;
+
+  sectors.forEach(sec => {
+    const {a0,a1,i} = sec;
+    const mid = (a0+a1)*0.5;
+    const depth = R*(mods[i]+gd);
+    const alpha = 0.12 + (forces[i]/100)*0.52;
+    const col = CS_COLORS[i];
+
+    // sector highlight
+    cCtx.beginPath(); cCtx.moveTo(ox,oy); cCtx.arc(ox,oy,R+3,a0,a1); cCtx.closePath();
+    cCtx.fillStyle = hexA(col,alpha); cCtx.fill();
+
+    // groove dimple
+    if(depth>1) {
+      const gx=ox+Math.cos(mid)*(R-depth*0.4), gy=oy+Math.sin(mid)*(R-depth*0.4);
+      cCtx.beginPath(); cCtx.arc(gx,gy,depth*1.15,0,Math.PI*2);
+      cCtx.fillStyle=hexA(col,0.35); cCtx.fill();
+    }
+
+    // % label
+    const lr=R+17;
+    cCtx.font="bold 8px 'DM Mono',monospace";
+    cCtx.fillStyle=col; cCtx.textAlign='center'; cCtx.textBaseline='middle';
+    cCtx.fillText(forces[i]+'%', ox+Math.cos(mid)*lr, oy+Math.sin(mid)*lr);
+  });
+
+  // inner circle
+  cCtx.beginPath(); cCtx.arc(ox,oy,R*0.22,0,Math.PI*2);
+  cCtx.fillStyle='#1a1c22'; cCtx.fill();
+  cCtx.strokeStyle='#2e3240'; cCtx.lineWidth=1; cCtx.stroke();
+
+  cCtx.textAlign='start'; cCtx.textBaseline='alphabetic';
+}
+
+function hexA(hex,a){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// ─── Finger bars ──────────────────────────────────────────
+function updateForce() {
+  const forces = contourData[S.contour].forces;
+  const maxF   = Math.max(...forces);
+  const ids    = ['thumb','index','middle','ring','pinky'];
+  const total  = 40;
+  ids.forEach((id,i) => {
+    document.getElementById('ff-'+id).style.width = (forces[i]/maxF*100)+'%';
+    document.getElementById('ff-'+id).textContent = forces[i]+'%';
+    document.getElementById('fv-'+id).textContent = (total*forces[i]/100).toFixed(1)+' N';
+  });
+  const mean = forces.reduce((a,b)=>a+b)/forces.length;
+  const vari = forces.reduce((s,f)=>s+(f-mean)**2,0)/forces.length;
+  const dot=document.getElementById('ff-dot'), txt=document.getElementById('ff-text');
+  if(vari<8)       { dot.style.background='#5fba88'; txt.style.color='#5fba88'; txt.textContent='✓ Equal force distribution — optimal ergonomics'; }
+  else if(vari<35) { dot.style.background='#c8973a'; txt.style.color='#c8973a'; txt.textContent='⚠ Moderate imbalance — consider ergonomic profile'; }
+  else             { dot.style.background='#e06050'; txt.style.color='#e06050'; txt.textContent='✕ Unequal load — high finger fatigue risk'; }
+}
+
+// ─── Mass distribution ────────────────────────────────────
+function updateMass() {
+  const front=Math.round(100-S.cwt), rear=Math.round(S.cwt);
+  document.getElementById('md-front').style.width=front+'%';
+  document.getElementById('md-front').textContent=front+'%';
+  document.getElementById('md-rear').style.width=rear+'%';
+  document.getElementById('md-rear').textContent=rear+'%';
+  document.getElementById('md-fp').textContent=front+'%';
+  document.getElementById('md-rp').textContent=rear+'%';
+  const diff=Math.abs(front-rear);
+  const b=document.getElementById('mass-badge');
+  const t=document.getElementById('mass-badge-txt');
+  if(diff<8)       { b.style.borderColor='var(--green)'; b.style.color='#5fba88'; t.textContent='Balanced — minimal wrist torque'; }
+  else if(diff<20) { b.style.borderColor='var(--brass)'; b.style.color='var(--brass)'; t.textContent='Slight imbalance — adjust counterweight'; }
+  else             { b.style.borderColor='var(--red)'; b.style.color='#e06050'; t.textContent='Front-heavy — increase counterweight'; }
+}
+
+// ─── Score ────────────────────────────────────────────────
+function updateScore() {
+  const forces=contourData[S.contour].forces;
+  const mean=forces.reduce((a,b)=>a+b)/forces.length;
+  const vari=forces.reduce((s,f)=>s+(f-mean)**2,0)/forces.length;
+  const fingerS = Math.max(0,100-vari*2.5);
+  const balDiff = Math.abs(50-S.cwt);
+  const balS    = Math.max(0,100-balDiff*3);
+  const torqueS = Math.max(0,100-balDiff*2.5-Math.abs(S.crv-65)*0.3);
+  const comfortS= Math.min(100,S.grv*7+S.swl*3+30);
+  const fatigueS= (fingerS*0.4+balS*0.3+comfortS*0.3);
+  const total   = Math.round((fingerS+balS+torqueS+comfortS+fatigueS)/5);
+
+  document.getElementById('score-num').textContent=total;
+  const circ=163;
+  const arc=document.getElementById('score-arc');
+  arc.setAttribute('stroke-dashoffset', circ-circ*total/100);
+  arc.setAttribute('stroke', total>75?'#c8973a':total>50?'#d4853a':'#b84030');
+  document.getElementById('score-label').textContent =
+    total>85?'Excellent':total>75?'Very Good':total>60?'Good':total>45?'Fair':'Poor';
+
+  const st=v=>'★'.repeat(Math.round(v/20))+'☆'.repeat(5-Math.round(v/20));
+  document.getElementById('m-balance').textContent=st(balS);
+  document.getElementById('m-finger').textContent=st(fingerS);
+  document.getElementById('m-torque').textContent=st(torqueS);
+  document.getElementById('m-comfort').textContent=st(comfortS);
+  document.getElementById('m-fatigue').textContent=st(fatigueS);
+
+  const chips=document.getElementById('feat-chips'); chips.innerHTML='';
+  const add=(l,g)=>{const s=document.createElement('span');s.className='chip '+(g?'good':'warn');s.textContent=l;chips.appendChild(s);};
+  add('Finger Saddles', S.contour==='ergonomic'||S.contour==='anatomic');
+  add('Equal Force',   vari<10);
+  add('50/50 Mass',    balDiff<8);
+  add('Palm Swell',    S.swl>=12);
+  add('Deep Grooves',  S.grv>=5);
+  add('Counterweight', S.cwt>=35);
+  if(vari>30) add('Uneven Load ⚠',false);
+  if(balDiff>20) add('Front-Heavy ⚠',false);
+}
+
+// ─── Controls ─────────────────────────────────────────────
+const fmts={
+  len:v=>`${v} mm`, dia:v=>`${v} mm`, grv:v=>`${v} mm`, pit:v=>`${v} mm`,
+  cwt:v=>`${v} %`, cwb:v=>`${(v/10).toFixed(1)}×`, swl:v=>`${(v/10).toFixed(1)}×`,
+  crv:v=>`${v}°`, rch:v=>`${v} mm`
+};
+function sp(k,v){ S[k]=parseFloat(v); document.getElementById('sv-'+k).textContent=fmts[k](v); redraw(); }
+
+function setContour(c){
+  S.contour=c;
+  document.querySelectorAll('.c-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('cp-'+c).classList.add('active');
+  document.getElementById('contour-desc').textContent=contourData[c].desc;
+  redraw();
+}
+
+function setTab(el,t){
+  S.tab=t;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('vp-lbl').textContent =
+    t==='hook'?'Redesigned — Finger-Contoured Handle Side View':
+    t==='cross'?'Refer cross-section panel below for finger analysis':
+    'Side-by-Side Comparison — Original vs Redesigned';
+  drawHook();
+}
+
+function redraw(){ drawHook(); drawCS(); updateForce(); updateMass(); updateScore(); }
+
+window.addEventListener('load',()=>{ resizeHook(); drawCS(); updateForce(); updateMass(); updateScore(); });
+</script>
+</body>
+</html>
